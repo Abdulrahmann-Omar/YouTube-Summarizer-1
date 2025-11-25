@@ -1,0 +1,36 @@
+.app {
+  min-height: 100vh;
+  background: var(--bg-secondary);
+}
+
+.input-section {
+  max-width: 800px;
+  margin: 0 auto;
+  background: var(--bg-primary);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 4px 20px var(--shadow);
+}
+
+.results-section {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.input-section,
+.results-section {
+  animation: fadeIn 0.5s ease;
+}
+

@@ -1,0 +1,34 @@
+# FastAPI and Server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+websockets==12.0
+
+# YouTube Processing
+yt-dlp==2024.3.10
+webvtt-py==0.4.6
+
+# NLP Core Libraries
+spacy==3.7.2
+spacy-transformers==1.3.4
+nltk==3.8.1
+
+# Traditional NLP/ML
+scikit-learn==1.4.0
+numpy==1.26.3
+pandas==2.2.0
+gensim==4.3.2
+
+# Google Gemini AI
+google-generativeai==0.3.2
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+aiofiles==23.2.1
+python-jose[cryptography]==3.3.0
+
+# Caching (optional but recommended)
+cachetools==5.3.2
+
