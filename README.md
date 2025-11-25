@@ -374,6 +374,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **[⬆ Back to Top](#-youtube-summarizer)**
 
-Made with ❤️ by developers who watch too many YouTube videos
+Made for NLP-project by developers who watch too many hidi-YouTube videos
 
 </div>
