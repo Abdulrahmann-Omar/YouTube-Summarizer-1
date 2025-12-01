@@ -4,21 +4,14 @@ uvicorn[standard]==0.27.0
 python-multipart==0.0.6
 websockets==12.0
 
-# NLP & ML
+# NLP & ML (Heavy)
 spacy==3.7.5
-https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+# Removed spacy-transformers to save space/time (not used in code)
 nltk==3.8.1
 scikit-learn==1.4.0
 numpy==1.26.3
 pandas==2.2.0
 gensim==4.3.2
-
-# YouTube Processing
-yt-dlp==2024.3.10
-webvtt-py==0.4.6
-
-# AI Services
-google-generativeai==0.3.2
 
 # Utilities
 python-dotenv==1.0.0

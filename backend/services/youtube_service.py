@@ -67,7 +67,7 @@ class YouTubeService:
     
     async def get_captions(self, url: str) -> Tuple[str, VideoInfo]:
         """
-        Extract captions from YouTube video.
+        Extract captions from YouTube video with retry and fallback logic.
         
         Args:
             url: YouTube video URL
@@ -79,27 +79,56 @@ class YouTubeService:
         temp_id = os.urandom(8).hex()
         output_template = os.path.join(self.temp_dir, f'yt_captions_{temp_id}.%(ext)s')
         
-        ydl_opts = {
-            'skip_download': True,
-            'writesubtitles': True,
-            'writeautomaticsub': True,
-            'subtitleslangs': ['en', 'en-US', 'en-GB'],  # Try multiple English variants
-            'subtitlesformat': 'vtt',
-            'outtmpl': output_template,
-            'nooverwrites': False,
-            'quiet': True,
-            'no_warnings': True
-        }
+        loop = asyncio.get_event_loop()
+        
+        # Try different subtitle language/format combinations with retries
+        subtitle_configs = [
+            # First try: English variants with vtt
+            {
+                'subtitleslangs': ['en', 'en-US', 'en-GB'],
+                'subtitlesformat': 'vtt',
+                'writesubtitles': True,
+                'writeautomaticsub': True,
+            },
+            # Second try: any language with vtt (auto-translated)
+            {
+                'subtitleslangs': ['en'],
+                'subtitlesformat': 'vtt',
+                'writesubtitles': True,
+                'writeautomaticsub': True,
+                'skip_unavailable_fragments': True,
+            },
+            # Third try: srt format
+            {
+                'subtitleslangs': ['en'],
+                'subtitlesformat': 'srt',
+                'writesubtitles': True,
+                'writeautomaticsub': True,
+            },
+            # Last try: all available subtitles (no language filter)
+            {
+                'writesubtitles': True,
+                'writeautomaticsub': True,
+                'skip_unavailable_fragments': True,
+            },
+        ]
+        
+        video_info = None
+        captions = None
+        last_error = None
         
         try:
-            # Extract captions in thread pool
-            loop = asyncio.get_event_loop()
+            # First, always fetch video info
+            info_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': True
+            }
             info_dict = await loop.run_in_executor(
                 None,
-                lambda: self._download_captions_sync(url, ydl_opts)
+                lambda: self._extract_info_sync(url, info_opts)
             )
             
-            # Extract video info
             video_info = VideoInfo(
                 title=info_dict.get('title', 'Unknown'),
                 duration=info_dict.get('duration'),
@@ -107,41 +136,66 @@ class YouTubeService:
                 description=info_dict.get('description', '')[:500]
             )
             
-            # Read caption file - try multiple possible filenames
-            caption_file = None
-            possible_files = [
-                f'yt_captions_{temp_id}.en.vtt',
-                f'yt_captions_{temp_id}.en-US.vtt',
-                f'yt_captions_{temp_id}.en-GB.vtt',
-                f'yt_captions_{temp_id}.vtt',
-                f'yt_captions_{temp_id}.en.srt',
-                f'yt_captions_{temp_id}.srt'
-            ]
+            # Try each subtitle configuration
+            for attempt, config in enumerate(subtitle_configs, 1):
+                try:
+                    logger.info(f"Attempt {attempt}: trying subtitle download with config {config}")
+                    
+                    ydl_opts = {
+                        'skip_download': True,
+                        'outtmpl': output_template,
+                        'nooverwrites': False,
+                        'quiet': True,
+                        'no_warnings': True,
+                    }
+                    ydl_opts.update(config)
+                    
+                    # Try to download captions
+                    await loop.run_in_executor(
+                        None,
+                        lambda: self._download_captions_sync(url, ydl_opts)
+                    )
+                    
+                    # Look for caption file
+                    caption_file = self._find_caption_file(temp_id)
+                    
+                    if caption_file:
+                        logger.info(f"Successfully found caption file: {caption_file}")
+                        captions = await loop.run_in_executor(
+                            None,
+                            lambda: self._parse_captions(caption_file)
+                        )
+                        
+                        if captions and len(captions.strip()) > 0:
+                            # Success! Clean up and return
+                            try:
+                                os.remove(caption_file)
+                            except Exception as cleanup_error:
+                                logger.warning(f"Could not remove temporary file: {cleanup_error}")
+                            
+                            return captions, video_info
+                        else:
+                            logger.warning(f"Caption file was empty, trying next method")
+                            try:
+                                os.remove(caption_file)
+                            except:
+                                pass
+                    
+                except Exception as e:
+                    last_error = str(e)
+                    logger.warning(f"Attempt {attempt} failed: {e}")
+                    continue
             
-            for filename in possible_files:
-                test_path = os.path.join(self.temp_dir, filename)
-                if os.path.exists(test_path):
-                    caption_file = test_path
-                    logger.info(f"Found caption file: {filename}")
-                    break
-            
-            if not caption_file:
-                raise FileNotFoundError(
-                    "Caption file not found. Video may not have English captions available. "
-                    "Try a video with captions enabled (look for the CC button on YouTube)."
+            # If all attempts failed, raise informative error
+            if not captions:
+                error_msg = (
+                    "Could not extract captions from this video. "
+                    "This usually means: (1) the video has no captions, "
+                    "(2) captions are disabled, or (3) the video is blocked from automated access. "
+                    f"Last error: {last_error}"
                 )
-            
-            # Parse captions
-            captions = await loop.run_in_executor(
-                None,
-                lambda: self._parse_captions(caption_file)
-            )
-            
-            # Cleanup
-            try:
-                os.remove(caption_file)
-            except Exception as cleanup_error:
-                logger.warning(f"Could not remove temporary file: {cleanup_error}")
+                logger.error(error_msg)
+                raise ValueError(error_msg)
             
             return captions, video_info
             
@@ -154,6 +208,45 @@ class YouTubeService:
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([url])
             return ydl.extract_info(url, download=False)
+    
+    def _find_caption_file(self, temp_id: str) -> Optional[str]:
+        """
+        Search for caption file with multiple possible extensions and language variants.
+        
+        Args:
+            temp_id: Temporary file ID prefix
+            
+        Returns:
+            Path to caption file if found, None otherwise
+        """
+        # Try multiple possible filenames
+        possible_files = [
+            f'yt_captions_{temp_id}.en.vtt',
+            f'yt_captions_{temp_id}.en-US.vtt',
+            f'yt_captions_{temp_id}.en-GB.vtt',
+            f'yt_captions_{temp_id}.vtt',
+            f'yt_captions_{temp_id}.en.srt',
+            f'yt_captions_{temp_id}.srt',
+            # Also try without language code (auto-downloaded)
+            f'yt_captions_{temp_id}.fr.vtt',
+            f'yt_captions_{temp_id}.de.vtt',
+            f'yt_captions_{temp_id}.es.vtt',
+        ]
+        
+        # Add any other vtt/srt files with this temp_id prefix
+        try:
+            temp_files = [f for f in os.listdir(self.temp_dir) if temp_id in f]
+            possible_files.extend(temp_files)
+        except Exception as e:
+            logger.warning(f"Could not list temp dir: {e}")
+        
+        for filename in possible_files:
+            test_path = os.path.join(self.temp_dir, filename)
+            if os.path.exists(test_path):
+                logger.info(f"Found caption file: {filename}")
+                return test_path
+        
+        return None
     
     def _parse_captions(self, caption_file: str) -> str:
         """

@@ -5,6 +5,24 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
+// Robust response parser: handles empty bodies and non-JSON responses
+async function parseResponse(response) {
+  // Read as text first to avoid JSON parse errors on empty responses
+  const text = await response.text()
+
+  if (!text) {
+    // No content
+    return null
+  }
+
+  // Try to parse JSON, otherwise return raw text
+  try {
+    return JSON.parse(text)
+  } catch (e) {
+    return text
+  }
+}
+
 /**
  * Summarize a YouTube video
  * @param {string} url - YouTube video URL
@@ -22,11 +40,13 @@ export async function summarizeVideo(url, method, fraction) {
   })
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.detail || 'Failed to summarize video')
+    const error = await parseResponse(response)
+    // Try to extract common error shapes
+    const detail = error && (error.detail || (error.error && error.error) || (error.message && error.message))
+    throw new Error(detail || 'Failed to summarize video')
   }
 
-  return response.json()
+  return parseResponse(response)
 }
 
 /**
@@ -38,11 +58,12 @@ export async function getVideoInfo(url) {
   const response = await fetch(`${API_BASE_URL}/video-info?url=${encodeURIComponent(url)}`)
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.detail || 'Failed to fetch video info')
+    const error = await parseResponse(response)
+    const detail = error && (error.detail || (error.error && error.error) || (error.message && error.message))
+    throw new Error(detail || 'Failed to fetch video info')
   }
 
-  return response.json()
+  return parseResponse(response)
 }
 
 /**
@@ -66,11 +87,12 @@ export async function askQuestion(question, videoContext, conversationHistory = 
   })
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.detail || 'Failed to get answer')
+    const error = await parseResponse(response)
+    const detail = error && (error.detail || (error.error && error.error) || (error.message && error.message))
+    throw new Error(detail || 'Failed to get answer')
   }
 
-  return response.json()
+  return parseResponse(response)
 }
 
 /**
@@ -84,7 +106,7 @@ export async function checkHealth() {
     throw new Error('Health check failed')
   }
 
-  return response.json()
+  return parseResponse(response)
 }
 
 /**

@@ -146,12 +146,19 @@ async def summarize_video(request: SummarizationRequest):
         
         # Extract captions and video info
         youtube_service = get_youtube_service()
-        captions, video_info = await youtube_service.get_captions(request.url)
+        try:
+            captions, video_info = await youtube_service.get_captions(request.url)
+        except ValueError as e:
+            # Caption extraction failed - return user-friendly error
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
         
         if not captions or len(captions.strip()) < 100:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Video captions are too short or unavailable"
+                detail="Video captions are too short or unavailable. Try a video with captions enabled (look for the CC button on YouTube)."
             )
         
         # Get NLP service for preprocessing

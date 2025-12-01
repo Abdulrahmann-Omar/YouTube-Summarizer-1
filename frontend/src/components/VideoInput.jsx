@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { FiYoutube, FiCheck, FiX } from 'react-icons/fi'
 import '../styles/VideoInput.css'
+import { getVideoInfo } from '../services/api'
 
 function VideoInput({ videoUrl, setVideoUrl, videoInfo, setVideoInfo }) {
   const [isValidating, setIsValidating] = useState(false)
@@ -39,10 +40,8 @@ function VideoInput({ videoUrl, setVideoUrl, videoInfo, setVideoInfo }) {
     setIsValidating(true)
     
     try {
-      const response = await fetch(`/api/video-info?url=${encodeURIComponent(url)}`)
-      
-      if (response.ok) {
-        const info = await response.json()
+      const info = await getVideoInfo(url)
+      if (info) {
         setVideoInfo(info)
         setIsValid(true)
       } else {
