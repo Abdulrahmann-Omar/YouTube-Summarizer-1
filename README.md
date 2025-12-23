@@ -1,3 +1,12 @@
+---
+title: YouTube Summarizer API
+emoji: 🎬
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 <div align="center">
 
 # 🎬 YouTube Summarizer

@@ -4,22 +4,34 @@
 
 | Service | Purpose | Deploy |
 |---------|---------|--------|
-| Render | Backend (FastAPI) | [Deploy to Render](https://dashboard.render.com/blueprints) |
+| Hugging Face | Backend (FastAPI / Docker) | [Create HF Space](https://huggingface.co/new-space) |
 | Vercel | Frontend (React) | [Deploy to Vercel](https://vercel.com/new) |
 
 ---
 
-## Step 1: Deploy Backend to Render
+## Step 1: Deploy Backend to Hugging Face Spaces
 
-1. Go to [Render Dashboard](https://dashboard.render.com/)
-2. Click **"New" → "Blueprint"**
-3. Connect your GitHub repo: `Abdulrahmann-Omar/YouTube-Summarizer-1`
-4. Render will detect `render.yaml` automatically
-5. Set environment variables:
-   - `GEMINI_API_KEY`: Your Google Gemini API key
-6. Click **"Apply"**
-7. Wait for deployment (~3-5 minutes)
-8. Copy your backend URL: `https://youtube-summarizer-api.onrender.com`
+1. Go to [Hugging Face - New Space](https://huggingface.co/new-space)
+2. **Settings**:
+   - **Space Name**: `youtube-summarizer-api`
+   - **SDK**: `Docker`
+   - **Template**: `Blank`
+   - **Visibility**: `Public` (or Private if preferred)
+3. Click **"Create Space"**
+4. Connect your GitHub repository:
+   - Go to **Settings** tab in your new Space
+   - Scroll to **"Connected GitHub Repository"**
+   - Connect `Abdulrahmann-Omar/YouTube-Summarizer-1`
+5. **Set Environment Variables**:
+   - Go to **Settings** tab → **"Variables and secrets"**
+   - Click **"New secret"**
+   - Name: `GEMINI_API_KEY`
+   - Value: `AIzaSyA8TEqjomna43KP2YDGa7dBxFENHyXks54` (or your personal key)
+6. **Deploy**:
+   - HF will automatically detect the root `Dockerfile` and start building.
+7. **Get API URL**:
+   - Once running, click **"Direct URL"** (found in the top right menu options `...` or under the App tab).
+   - It will look like: `https://[username]-[space-name].hf.space`
 
 ---
 
@@ -32,21 +44,9 @@
    - **Root Directory**: `frontend`
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
-4. Add environment variable:
-   - `VITE_API_URL`: `https://youtube-summarizer-api.onrender.com`
+4. **Add Environment Variable**:
+   - `VITE_API_URL`: `https://[username]-[space-name].hf.space` (from Step 1)
 5. Click **"Deploy"**
-
----
-
-## Alternative: Single Vercel Deployment (Full Stack)
-
-For simpler deployment, you can deploy both frontend and backend on Vercel:
-
-1. Go to [Vercel Dashboard](https://vercel.com/new)
-2. Import your repo
-3. Set environment variables:
-   - `GEMINI_API_KEY`: Your Gemini API key
-4. Vercel will use the root `vercel.json` if present
 
 ---
 
@@ -54,16 +54,15 @@ For simpler deployment, you can deploy both frontend and backend on Vercel:
 
 | Variable | Service | Value |
 |----------|---------|-------|
-| `GEMINI_API_KEY` | Backend | Get from [Google AI Studio](https://makersuite.google.com/app/apikey) |
-| `VITE_API_URL` | Frontend | Your Render backend URL |
-| `CORS_ORIGINS` | Backend | Your Vercel frontend URL |
+| `GEMINI_API_KEY` | HF Space | Get from [Google AI Studio](https://makersuite.google.com/app/apikey) |
+| `VITE_API_URL` | Vercel | Your Hugging Face Space URL |
 
 ---
 
 ## Verify Deployment
 
-1. **Backend Health**: `https://your-backend.onrender.com/health`
-2. **API Docs**: `https://your-backend.onrender.com/docs`
+1. **Backend Health**: `https://[username]-[space-name].hf.space/health`
+2. **API Docs**: `https://[username]-[space-name].hf.space/docs`
 3. **Frontend**: `https://your-app.vercel.app`
 
 ---
@@ -72,7 +71,7 @@ For simpler deployment, you can deploy both frontend and backend on Vercel:
 
 | Issue | Solution |
 |-------|----------|
-| CORS errors | Add frontend URL to `CORS_ORIGINS` in Render |
-| API not responding | Check Render logs for errors |
-| Gemini errors | Verify `GEMINI_API_KEY` is set correctly |
-| Build failures | Check `npm install` in frontend folder |
+| Build Error | Ensure `Dockerfile` is in the root directory and correctly references `backend/` |
+| API not responding | Check HF Space logs for errors |
+| Gemini errors | Verify `GEMINI_API_KEY` is set in HF Secrets |
+| Build failures | Check `backend/requirements.txt` for any incompatible versions |
