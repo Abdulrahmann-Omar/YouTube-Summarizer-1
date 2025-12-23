@@ -1,0 +1,23 @@
+# Render Blueprint for YouTube Summarizer Backend
+# Deploy at: https://dashboard.render.com/blueprints
+
+services:
+  - type: web
+    name: youtube-summarizer-api
+    env: python
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false  # Set manually in dashboard
+      - key: CORS_ORIGINS
+        value: https://youtube-summarizer-1.vercel.app,http://localhost:3000
+      - key: DEBUG_MODE
+        value: false
+      - key: LOG_LEVEL
+        value: INFO
