@@ -27,6 +27,7 @@ from services.youtube_service import get_youtube_service
 from services.nlp_service import get_nlp_service
 from services.summarization_service import get_summarization_service
 from services.gemini_service import get_gemini_service
+from services.finetuned_summarizer import get_finetuned_service, FinetunedModel
 
 # Configure logging
 logging.basicConfig(
@@ -171,6 +172,17 @@ async def summarize_video(request: SummarizationRequest):
                 request.fraction,
                 video_info.title
             )
+        elif request.method in [SummarizationMethod.DISTILBART, SummarizationMethod.T5_SMALL]:
+            # Use fine-tuned models
+            finetuned_service = get_finetuned_service()
+            model_type = (
+                FinetunedModel.DISTILBART 
+                if request.method == SummarizationMethod.DISTILBART 
+                else FinetunedModel.T5_SMALL
+            )
+            result = finetuned_service.summarize(captions, model_type)
+            summary = result["summary"]
+            suggested_questions = []
         else:
             # Use traditional methods
             summarization_service = get_summarization_service()

@@ -14,6 +14,8 @@ class SummarizationMethod(str, Enum):
     GENSIM = "gensim"
     GEMINI = "gemini"
     HYBRID = "hybrid"
+    DISTILBART = "distilbart"  # Fine-tuned model
+    T5_SMALL = "t5-small"  # Fine-tuned model
 
 
 class SummarizationRequest(BaseModel):
