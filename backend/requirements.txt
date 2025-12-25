@@ -5,6 +5,11 @@ python-multipart==0.0.6
 websockets==12.0
 
 # NLP & ML
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+transformers==4.37.2
+accelerate==0.26.1
+sentencepiece==0.1.99
 spacy==3.7.5
 https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 nltk==3.8.1
