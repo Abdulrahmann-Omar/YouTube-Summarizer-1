@@ -3,6 +3,8 @@ import '../styles/SummarizationOptions.css'
 function SummarizationOptions({ method, setMethod, fraction, setFraction }) {
   const methods = [
     { value: 'gemini', label: 'Gemini AI', description: 'Best quality, abstractive summarization' },
+    { value: 'distilbart', label: 'DistilBART (Fine-tuned)', description: 'High-quality abstractive, trained on CNN/DailyMail' },
+    { value: 't5-small', label: 'T5-small (Fine-tuned)', description: 'Fast & efficient, trained on CNN/DailyMail' },
     { value: 'tfidf', label: 'TF-IDF', description: 'Fast, keyword-focused extraction' },
     { value: 'frequency', label: 'Frequency-Based', description: 'Position-aware sentence selection' },
     { value: 'gensim', label: 'Gensim TextRank', description: 'Graph-based summarization' },
