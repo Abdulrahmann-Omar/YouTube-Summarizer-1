@@ -1,14 +1,42 @@
 {
   "version": 2,
-  "framework": "vite",
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/dist",
-  "installCommand": "cd frontend && npm install",
-  "devCommand": "cd frontend && npm run dev",
+  "builds": [
+    {
+      "src": "backend/main.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/health",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/docs",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend/dist/$1"
+    }
+  ],
   "env": {
-    "VITE_API_URL": {
-      "description": "Backend API URL (Render deployment)",
-      "value": ""
+    "GEMINI_API_KEY": "@gemini-api-key"
+  },
+  "build": {
+    "env": {
+      "PYTHON_VERSION": "3.11"
     }
   }
 }
