@@ -31,7 +31,7 @@ async function parseResponse(response) {
  * @returns {Promise<Object>} Summary response
  */
 export async function summarizeVideo(url, method, fraction) {
-  const response = await fetch(`${API_BASE_URL}/summarize`, {
+  const response = await fetch(`${API_BASE_URL}/api/summarize`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -55,7 +55,7 @@ export async function summarizeVideo(url, method, fraction) {
  * @returns {Promise<Object>} Video info
  */
 export async function getVideoInfo(url) {
-  const response = await fetch(`${API_BASE_URL}/video-info?url=${encodeURIComponent(url)}`)
+  const response = await fetch(`${API_BASE_URL}/api/video-info?url=${encodeURIComponent(url)}`)
 
   if (!response.ok) {
     const error = await parseResponse(response)
@@ -74,7 +74,7 @@ export async function getVideoInfo(url) {
  * @returns {Promise<Object>} Answer response
  */
 export async function askQuestion(question, videoContext, conversationHistory = []) {
-  const response = await fetch(`${API_BASE_URL}/qa`, {
+  const response = await fetch(`${API_BASE_URL}/api/qa`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -100,7 +100,7 @@ export async function askQuestion(question, videoContext, conversationHistory = 
  * @returns {Promise<Object>} Health status
  */
 export async function checkHealth() {
-  const response = await fetch('/health')
+  const response = await fetch(`${API_BASE_URL}/health`)
 
   if (!response.ok) {
     throw new Error('Health check failed')
@@ -117,7 +117,7 @@ export async function checkHealth() {
 export function createChatWebSocket(clientId) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const wsUrl = `${protocol}//${window.location.host}/ws/chat/${clientId}`
-  
+
   return new WebSocket(wsUrl)
 }
 
