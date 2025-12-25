@@ -2,8 +2,11 @@
  * API service for communicating with the backend.
  * Uses native fetch for HTTP requests and WebSocket for real-time chat.
  */
+// Get API base URL from env or use relative path for local dev
+const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+// Debug: log the API URL being used (remove after debugging)
+console.log('[API] Base URL:', API_BASE_URL || '(using relative path)')
 
 // Robust response parser: handles empty bodies and non-JSON responses
 async function parseResponse(response) {
