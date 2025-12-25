@@ -7,10 +7,13 @@ import asyncio
 import os
 import tempfile
 import logging
+import re
 from typing import Dict, Optional, Tuple
 import yt_dlp
 import webvtt
 from pathlib import Path
+from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
 
 from models.schemas import VideoInfo
 
@@ -65,9 +68,79 @@ class YouTubeService:
         with yt_dlp.YoutubeDL(opts) as ydl:
             return ydl.extract_info(url, download=False)
     
+    def _extract_video_id(self, url: str) -> Optional[str]:
+        """
+        Extract video ID from YouTube URL.
+        
+        Args:
+            url: YouTube video URL
+            
+        Returns:
+            Video ID or None if not found
+        """
+        patterns = [
+            r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
+            r'(?:embed\/|v\/|youtu\.be\/)([0-9A-Za-z_-]{11})'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                return match.group(1)
+        
+        return None
+    
+    async def _get_captions_via_transcript_api(self, video_id: str) -> str:
+        """
+        Primary method: Extract captions using youtube-transcript-api.
+        More reliable and bypasses many download restrictions.
+        
+        Args:
+            video_id: YouTube video ID
+            
+        Returns:
+            Caption text
+        """
+        loop = asyncio.get_event_loop()
+        
+        # Try multiple language codes
+        language_codes = ['en', 'en-US', 'en-GB', 'a.en']  # a.en = auto-generated
+        
+        for lang_code in language_codes:
+            try:
+                logger.info(f"Trying youtube-transcript-api with language: {lang_code}")
+                
+                # Run in thread pool
+                transcript_list = await loop.run_in_executor(
+                    None,
+                    lambda: YouTubeTranscriptApi.get_transcript(
+                        video_id,
+                        languages=[lang_code]
+                    )
+                )
+                
+                # Concatenate all caption entries
+                caption_text = " ".join([entry['text'] for entry in transcript_list])
+                
+                if caption_text and len(caption_text.strip()) > 0:
+                    logger.info(f"Successfully extracted captions via transcript API ({lang_code})")
+                    return caption_text
+                    
+            except (NoTranscriptFound, TranscriptsDisabled) as e:
+                logger.debug(f"Language {lang_code} not available: {e}")
+                continue
+            except Exception as e:
+                logger.warning(f"Transcript API failed for {lang_code}: {e}")
+                continue
+        
+        raise ValueError("No transcripts found via transcript API")
+    
     async def get_captions(self, url: str) -> Tuple[str, VideoInfo]:
         """
-        Extract captions from YouTube video with retry and fallback logic.
+        Extract captions from YouTube video with dual-method approach.
+        
+        Primary: youtube-transcript-api (more reliable)
+        Fallback: yt-dlp (works for some edge cases)
         
         Args:
             url: YouTube video URL
@@ -75,11 +148,50 @@ class YouTubeService:
         Returns:
             Tuple of (caption_text, video_info)
         """
+        # Extract video ID
+        video_id = self._extract_video_id(url)
+        if not video_id:
+            raise ValueError("Could not extract video ID from URL")
+        
+        loop = asyncio.get_event_loop()
+        
+        # First, always fetch video info
+        try:
+            info_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': True
+            }
+            info_dict = await loop.run_in_executor(
+                None,
+                lambda: self._extract_info_sync(url, info_opts)
+            )
+            
+            video_info = VideoInfo(
+                title=info_dict.get('title', 'Unknown'),
+                duration=info_dict.get('duration'),
+                channel=info_dict.get('uploader'),
+                description=info_dict.get('description', '')[:500]
+            )
+        except Exception as e:
+            logger.warning(f"Could not fetch video info: {e}")
+            video_info = VideoInfo(title="Unknown", duration=None, channel=None, description="")
+        
+        # METHOD 1: Try youtube-transcript-api (primary - more reliable)
+        try:
+            logger.info("Attempting caption extraction via youtube-transcript-api...")
+            captions = await self._get_captions_via_transcript_api(video_id)
+            logger.info("✅ Successfully extracted captions via youtube-transcript-api")
+            return captions, video_info
+        except Exception as transcript_api_error:
+            logger.warning(f"youtube-transcript-api failed: {transcript_api_error}")
+        
+        # METHOD 2: Fallback to yt-dlp
+        logger.info("Falling back to yt-dlp method...")
+        
         # Generate unique temporary filename
         temp_id = os.urandom(8).hex()
         output_template = os.path.join(self.temp_dir, f'yt_captions_{temp_id}.%(ext)s')
-        
-        loop = asyncio.get_event_loop()
         
         # Try different subtitle language/format combinations with retries
         subtitle_configs = [
@@ -113,29 +225,10 @@ class YouTubeService:
             },
         ]
         
-        video_info = None
         captions = None
         last_error = None
         
         try:
-            # First, always fetch video info
-            info_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'extract_flat': True
-            }
-            info_dict = await loop.run_in_executor(
-                None,
-                lambda: self._extract_info_sync(url, info_opts)
-            )
-            
-            video_info = VideoInfo(
-                title=info_dict.get('title', 'Unknown'),
-                duration=info_dict.get('duration'),
-                channel=info_dict.get('uploader'),
-                description=info_dict.get('description', '')[:500]
-            )
-            
             # Try each subtitle configuration
             for attempt, config in enumerate(subtitle_configs, 1):
                 try:

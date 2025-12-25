@@ -19,8 +19,9 @@ pandas==2.2.0
 gensim==4.3.2
 
 # YouTube Processing
-yt-dlp==2024.3.10
+yt-dlp==2024.12.23
 webvtt-py==0.4.6
+youtube-transcript-api==0.6.3
 
 # AI Services
 google-generativeai==0.3.2
