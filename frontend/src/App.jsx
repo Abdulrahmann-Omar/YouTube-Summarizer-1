@@ -43,24 +43,10 @@ function App() {
     setShowChat(false)
     
     try {
-      const response = await fetch('/api/summarize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: url,
-          method: method,
-          fraction: frac,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to summarize video')
-      }
-
-      const data = await response.json()
+      // Use API service (which uses VITE_API_URL for production)
+      const { summarizeVideo } = await import('./services/api')
+      const data = await summarizeVideo(url, method, frac)
+      
       setSummary(data)
       setVideoInfo(data.video_info)
       setVideoContext(data.summary) // Use summary as context for Q&A
