@@ -47,6 +47,25 @@ class SummarizationRequest(BaseModel):
         return v
 
 
+class TextSummarizationRequest(BaseModel):
+    """Request model for direct text summarization (no YouTube fetching)."""
+    text: str = Field(..., min_length=100, description="Text to summarize")
+    method: SummarizationMethod = Field(
+        default=SummarizationMethod.GEMINI,
+        description="Summarization method to use"
+    )
+    fraction: float = Field(
+        default=0.3,
+        ge=0.1,
+        le=0.8,
+        description="Fraction of content to include in summary (0.1-0.8)"
+    )
+    video_title: Optional[str] = Field(
+        default="Video",
+        description="Optional video title for context"
+    )
+
+
 class VideoInfo(BaseModel):
     """Video metadata information."""
     title: str

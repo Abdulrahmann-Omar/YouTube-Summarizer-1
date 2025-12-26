@@ -27,29 +27,90 @@ async function parseResponse(response) {
 }
 
 /**
- * Summarize a YouTube video
+ * Fetch captions from YouTube via Vercel serverless function
+ * @param {string} url - YouTube video URL
+ * @returns {Promise<Object>} Captions response
+ */
+export async function getCaptions(url) {
+  console.log('[API] Fetching captions from Vercel...')
+  const response = await fetch('/api/get-captions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ url }),
+  })
+
+  if (!response.ok) {
+    const error = await parseResponse(response)
+    const detail = error && (error.error || error.detail || 'Failed to fetch captions')
+    throw new Error(detail)
+  }
+
+  const data = await parseResponse(response)
+  console.log(`[API] Captions fetched: ${data.word_count} words`)
+  return data
+}
+
+/**
+ * Summarize text directly (bypasses YouTube fetching)
+ * @param {string} text - Text to summarize
+ * @param {string} method - Summarization method
+ * @param {number} fraction - Summary fraction
+ * @param {string} videoTitle - Optional video title
+ * @returns {Promise<Object>} Summary response
+ */
+export async function summarizeText(text, method, fraction, videoTitle = 'Video') {
+  console.log('[API] Sending text to HF for summarization...')
+  const response = await fetch(`${API_BASE_URL}/api/summarize-text`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      text,
+      method,
+      fraction,
+      video_title: videoTitle
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await parseResponse(response)
+    const detail = error && (error.detail || error.error || 'Failed to summarize text')
+    throw new Error(detail)
+  }
+
+  return parseResponse(response)
+}
+
+/**
+ * Summarize a YouTube video using split architecture:
+ * 1. Fetch captions from Vercel (has YouTube access)
+ * 2. Send text to HF Spaces for summarization (has compute power)
+ * 
  * @param {string} url - YouTube video URL
  * @param {string} method - Summarization method
  * @param {number} fraction - Summary fraction (0.1-0.8)
  * @returns {Promise<Object>} Summary response
  */
 export async function summarizeVideo(url, method, fraction) {
-  const response = await fetch(`${API_BASE_URL}/api/summarize`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ url, method, fraction }),
-  })
+  // Step 1: Get captions from Vercel serverless function
+  const captionsData = await getCaptions(url)
 
-  if (!response.ok) {
-    const error = await parseResponse(response)
-    // Try to extract common error shapes
-    const detail = error && (error.detail || (error.error && error.error) || (error.message && error.message))
-    throw new Error(detail || 'Failed to summarize video')
+  if (!captionsData.transcript || captionsData.transcript.length < 100) {
+    throw new Error('Video captions are too short or unavailable')
   }
 
-  return parseResponse(response)
+  // Step 2: Send text to HF Spaces for summarization
+  const summaryData = await summarizeText(
+    captionsData.transcript,
+    method,
+    fraction,
+    `Video ${captionsData.video_id}`
+  )
+
+  return summaryData
 }
 
 /**
@@ -125,6 +186,8 @@ export function createChatWebSocket(clientId) {
 }
 
 export default {
+  getCaptions,
+  summarizeText,
   summarizeVideo,
   getVideoInfo,
   askQuestion,

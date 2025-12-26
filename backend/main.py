@@ -16,6 +16,7 @@ from config import settings
 from models.schemas import (
     SummarizationRequest,
     SummarizationResponse,
+    TextSummarizationRequest,
     QuestionRequest,
     QuestionResponse,
     ErrorResponse,
@@ -223,6 +224,111 @@ async def summarize_video(request: SummarizationRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process video: {str(e)}"
+        )
+
+
+# Text summarization endpoint (for split architecture - receives text directly)
+@app.post("/api/summarize-text", response_model=SummarizationResponse)
+async def summarize_text(request: TextSummarizationRequest):
+    """
+    Summarize text directly (without YouTube fetching).
+    Used when captions are fetched by a separate service (e.g., Vercel).
+    
+    Args:
+        request: TextSummarizationRequest with text, method, and fraction
+        
+    Returns:
+        SummarizationResponse with summary and metadata
+    """
+    start_time = time.time()
+    
+    try:
+        logger.info(f"Processing text ({len(request.text)} chars) with method: {request.method}")
+        
+        captions = request.text
+        
+        if len(captions.strip()) < 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Text is too short (minimum 100 characters)"
+            )
+        
+        # Create minimal video info
+        video_info = VideoInfo(
+            title=request.video_title or "Video",
+            duration=None,
+            channel=None,
+            description=""
+        )
+        
+        # Get NLP service for preprocessing
+        nlp_service = get_nlp_service()
+        
+        # Generate summary based on method
+        if request.method == SummarizationMethod.GEMINI:
+            gemini_service = get_gemini_service()
+            if not gemini_service.is_available():
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Gemini API not available. Please configure GEMINI_API_KEY"
+                )
+            
+            summary, suggested_questions = await gemini_service.summarize_text(
+                captions,
+                request.fraction,
+                video_info.title
+            )
+        elif request.method in [SummarizationMethod.DISTILBART, SummarizationMethod.T5_SMALL]:
+            # Use fine-tuned models
+            finetuned_service = get_finetuned_service()
+            model_type = (
+                FinetunedModel.DISTILBART 
+                if request.method == SummarizationMethod.DISTILBART 
+                else FinetunedModel.T5_SMALL
+            )
+            result = finetuned_service.summarize(captions, model_type)
+            summary = result["summary"]
+            suggested_questions = []
+        else:
+            # Use traditional methods
+            summarization_service = get_summarization_service()
+            summary = await summarization_service.summarize(
+                captions,
+                request.method,
+                request.fraction
+            )
+            suggested_questions = []
+        
+        # Calculate statistics
+        stats = nlp_service.calculate_text_statistics(summary)
+        
+        # Extract entities and topics
+        entities = nlp_service.extract_key_entities(summary)
+        topics = nlp_service.get_key_topics(summary, top_n=8)
+        
+        processing_time = time.time() - start_time
+        
+        logger.info(f"Text summary generated in {processing_time:.2f}s")
+        
+        return SummarizationResponse(
+            success=True,
+            video_info=video_info,
+            summary=summary,
+            method_used=request.method,
+            processing_time=processing_time,
+            word_count=stats['word_count'],
+            sentence_count=stats['sentence_count'],
+            entities=entities[:10] if entities else None,
+            key_topics=topics if topics else None
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Text summarization error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to summarize text: {str(e)}"
         )
 
 
